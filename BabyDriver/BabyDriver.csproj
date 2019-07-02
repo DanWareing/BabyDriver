@@ -60,6 +60,7 @@
   <ItemGroup>
     <Compile Include="Cops\Cop.cs" />
     <Compile Include="Cops\Cops.cs" />
+    <Compile Include="Crew\Crew.cs" />
     <Compile Include="Crew\CrewMember.cs" />
     <Compile Include="Dialogue.cs" />
     <Compile Include="Jobs\247.cs" />

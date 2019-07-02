@@ -36,5 +36,24 @@ namespace BabyDriver.Cops
                 Function.Call(Hash.SET_PED_AS_COP, cop, true);
             }
         }
+
+        public static void MissionFailSpawn()
+        {
+            Vector3 carOneLocation = new Vector3(127.4381f, 361.2418f, 1000f);
+            Vehicle copCarOne = SpawnCar(4, carOneLocation, 120f);
+            Vector3 copCarOneTarget = new Vector3(137.5328f, 309.8216f, 1000f);
+            copCarOneTarget.Z = World.GetGroundHeight(copCarOneTarget);
+            copCarOne.Driver.Task.DriveTo(copCarOne, copCarOneTarget, 2f, 30f);
+
+            Vehicle copCarTwo = SpawnCar(4, carOneLocation, 120f);
+            Vector3 copCarTwoTarget = new Vector3(128.898f, 308.2f, 1000f);
+            copCarTwoTarget.Z = World.GetGroundHeight(copCarTwoTarget);
+            copCarTwo.Position += copCarTwo.ForwardVector * -30f;
+            copCarTwo.Driver.Task.DriveTo(copCarTwo, copCarTwoTarget, 2f, 30f);
+
+            Vector3 copPedLocation = new Vector3(154.6699f, 304.3619f, 1000f);
+            copPedLocation.Z = World.GetGroundHeight(copPedLocation);
+            SpawnPeds(2, copPedLocation);
+        }
     }
 }

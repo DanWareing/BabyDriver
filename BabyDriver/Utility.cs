@@ -98,6 +98,26 @@ namespace BabyDriver
                 Game.Player.Character.CurrentVehicle.GetPedOnSeat(VehicleSeat.Driver) == Game.Player.Character
             );
         }
+        public static Blip createBlip(Vector3 location, string name)
+        {
+            Blip currentStageBlip = World.CreateBlip(location);
+            currentStageBlip.ShowRoute = true;
+            currentStageBlip.Name = name;
+            currentStageBlip.Color = BlipColor.Yellow2;
+            switch (name)
+            {
+                case "Crew Pickup":
+                    currentStageBlip.Sprite = BlipSprite.Cab;
+                    break;
+                case "Heist Location":
+                    currentStageBlip.Sprite = BlipSprite.DollarSign;
+                    break;
+                case "Crew Drop-off":
+                    currentStageBlip.Sprite = BlipSprite.Garage;
+                    break;
+            }
+            return currentStageBlip;
+        }
 
     }
 }

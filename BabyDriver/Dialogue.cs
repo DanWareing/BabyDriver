@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace BabyDriver
 {
@@ -42,5 +38,23 @@ namespace BabyDriver
             "Crew: Nice getaway, but you gotta be more careful next time.",
             "Crew: We gotta lose them before we get back to the lockup next time. Laters."
         };
+
+        public static List<string> docMissionReady = new List<string>
+        {
+            "Okay, we're ready. Drop by.",
+            "Let's meet. I've got a job.",
+            "Alright, let's get to work."
+        };
+
+        public static List<string> stageEndSuccess = new List<string>
+        {
+            "I believe congratulations are due. Let's work together again."
+        };
+
+        public static List<string> stageEndFail = new List<string>
+        {
+            "You've just made some very powerful enemies. Never contact me again, and sleep with one eye open..."
+        };
+
     }
 }

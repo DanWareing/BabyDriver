@@ -22,13 +22,6 @@ namespace BabyDriver
     {
 
         // CONSTANTS
-        const BlipColor MY_BLIP_COLOR = BlipColor.Yellow2;
-        const string CREW_PICKUP_BLIP_NAME = "Crew Pickup";
-        const BlipSprite CREW_PICKUP_BLIP_SPRITE = BlipSprite.Cab;
-        const string HEIST_LOCATION_BLIP_NAME = "Heist Location";
-        const BlipSprite HEIST_LOCATION_BLIP_SPRITE = BlipSprite.DollarSign;
-        const string CREW_DROPOFF_BLIP_NAME = "Crew Drop-off";
-        const BlipSprite CREW_DROPOFF_BLIP_SPRITE = BlipSprite.Garage;
         const int NEW_JOB_MIN_TICKS = 10000;
         const int NEW_JOB_MAX_TICKS = 11000;
 
@@ -53,7 +46,6 @@ namespace BabyDriver
         private bool hasPreparedLocation;
         private List<CrewMember> currentCrew = new List<CrewMember>();
         private List<Ped> heistTargets = new List<Ped>();
-        private List<Ped> allPedsInvolved = new List<Ped>();
         private List<Cop> currentCops = new List<Cop>();
         private List<Vehicle> eligibleVehicles = new List<Vehicle>();
         public List<Ped> testPeds = new List<Ped>();
@@ -140,13 +132,19 @@ namespace BabyDriver
             }
             if (Utility.IsPlayerDriving()) vehicleOnTickUpdates();
             if (Game.Player.Character.IsInVehicle()) Game.Player.Character.CurrentVehicle.HandbrakeOn = shouldDisableVehicle();
-            if (Game.Player.Character.IsJacking) playerIsJackingCar();
+            if (Game.Player.Character.IsJacking) Game.Player.Character.GetVehicleIsTryingToEnter().IsStolen = true;
 
-            // 
+            // Staging
             if (StageConditions.isReadyForNewJob(currentStageAction, newJobStartTick)) createNewJob();
             if (isCloseToCurrentStageLocation()) closeToStageLocationActions();
             if (isAtCurrentStageLocation()) nextStage();
-            if (shouldSpawnCrew()) spawnCrew();
+            if (shouldSpawnCrew())
+            {
+                foreach (CrewMember crewMember in Crew.Crew.SpawnCrew(this, currentJob.locationSet))
+                {
+                    currentCrew.Add(crewMember);
+                }
+            }
             if (StageConditions.isStageCloseSuccessReady(currentStageAction, currentStageLocation, currentPlayerPosition)) stageCloseSuccess();
             if (StageConditions.isStageCloseFailReady(currentStageAction)) stageCloseFail();
             if (Utility.IsPlayerDeadOrBusted() && currentStageAction != Jobs.Stage.NONE) resetAll();
@@ -227,7 +225,7 @@ namespace BabyDriver
             if (currentStageBlip != null && currentStageBlip.Exists()) currentStageBlip.Remove();
             currentStageLocation = currentJob.locationSet.heistDropoffLocation;
             currentStageLocation.Z = World.GetGroundHeight(new Vector2(currentStageLocation.X, currentStageLocation.Y));
-            createBlip(currentStageLocation, true, HEIST_LOCATION_BLIP_NAME, HEIST_LOCATION_BLIP_SPRITE);
+            currentStageBlip = Utility.createBlip(currentStageLocation, "Heist Location");
             currentStageAction = Jobs.Stage.JOURNEY;
         }
         
@@ -235,7 +233,6 @@ namespace BabyDriver
         {
             Ped heistTargetPed = currentJob.GetTargetPed();
             heistTargets.Add(heistTargetPed);
-            allPedsInvolved.Add(heistTargetPed);
             Vector3 heistLocation = currentJob.locationSet.heistStartLocations[0];
             heistLocation.Z = World.GetGroundHeight(new Vector2(heistLocation.X, heistLocation.Y));
             foreach (CrewMember crewMember in currentCrew)
@@ -274,7 +271,7 @@ namespace BabyDriver
             Game.Player.WantedLevel = 2;
             if (currentStageBlip != null && currentStageBlip.Exists()) currentStageBlip.Remove();
             currentStageLocation = new Vector3(146.7975f, 321.4382f, 1000f);
-            createBlip(currentStageLocation, true, CREW_DROPOFF_BLIP_NAME, CREW_DROPOFF_BLIP_SPRITE);
+            currentStageBlip = Utility.createBlip(currentStageLocation, "Crew Drop-off");
             currentStageAction = Jobs.Stage.ESCAPE;
         }
 
@@ -295,31 +292,15 @@ namespace BabyDriver
                 currentJob.locationSet.isComplete = true;
                 if (currentStageBlip != null && currentStageBlip.Exists()) currentStageBlip.Remove();
                 currentLevel++;
-            } else
+            }
+            else
             {
                 currentStageAction = Jobs.Stage.FAIL;
                 Random random = new Random();
                 int index = random.Next(Dialogue.wantedOnArrival.Count);
                 string response = Dialogue.wantedOnArrival[index];
                 UI.ShowSubtitle(response, 5);
-
-                // Spawn Cop Cars and Peds
-                Vector3 carOneLocation = new Vector3(127.4381f, 361.2418f, 1000f);
-                Vehicle copCarOne = CopGenerator.SpawnCar(4, carOneLocation, 120f);
-                Vector3 copCarOneTarget = new Vector3(137.5328f, 309.8216f, 1000f);
-                copCarOneTarget.Z = World.GetGroundHeight(copCarOneTarget);
-                copCarOne.Driver.Task.DriveTo(copCarOne, copCarOneTarget, 2f, 30f);
-
-                Vehicle copCarTwo = CopGenerator.SpawnCar(4, carOneLocation, 120f);
-                Vector3 copCarTwoTarget = new Vector3(128.898f, 308.2f, 1000f);
-                copCarTwoTarget.Z = World.GetGroundHeight(copCarTwoTarget);
-                copCarTwo.Position += copCarTwo.ForwardVector * -30f;
-                copCarTwo.Driver.Task.DriveTo(copCarTwo, copCarTwoTarget, 2f, 30f);
-
-                Vector3 copPedLocation = new Vector3(154.6699f, 304.3619f, 1000f);
-                copPedLocation.Z = World.GetGroundHeight(copPedLocation);
-                CopGenerator.SpawnPeds(4, copPedLocation);
-
+                CopGenerator.MissionFailSpawn();
             }
         }
 
@@ -332,11 +313,11 @@ namespace BabyDriver
                     isPlayerEligible = false;
                 }
             }
-            string messageText = isPlayerEligible ?
-                "I've just heard the news, congratulations. Call me tomorrow." :
-                "You've just made some very powerful enemies. Never contact me again, and sleep with one eye open...";
+            Random random = new Random();
+            int index = random.Next(Dialogue.stageEndSuccess.Count);
+            string response = isPlayerEligible ? Dialogue.stageEndSuccess[index] : Dialogue.stageEndFail[index];
             Function.Call(Hash._SET_NOTIFICATION_TEXT_ENTRY, "STRING");
-            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, messageText);
+            Function.Call(Hash._ADD_TEXT_COMPONENT_STRING, response);
             Function.Call(Hash._SET_NOTIFICATION_MESSAGE, "CHAR_BLANK_ENTRY", "CHAR_BLANK_ENTRY", false, 4, "Message", "Doc");
             Function.Call(Hash._DRAW_NOTIFICATION, false, true);
             Function.Call(Hash.PLAY_MISSION_COMPLETE_AUDIO, "FRANKLIN_BIG_01");
@@ -383,15 +364,6 @@ namespace BabyDriver
             Vehicle attempt = Game.Player.Character.GetVehicleIsTryingToEnter();
             if (attempt.Driver == null && attempt.HasBeenDamagedBy(Game.Player.Character) && !attempt.AlarmActive) attempt.StartAlarm();
             if (attempt.Driver != null && attempt.EngineRunning && attempt.AlarmActive) Function.Call(Hash.SET_VEHICLE_ALARM, attempt, false);
-        }
-
-        private void createBlip(Vector3 location, bool showRoute, string name, BlipSprite sprite)
-        {
-            currentStageBlip = World.CreateBlip(location);
-            currentStageBlip.ShowRoute = showRoute;
-            currentStageBlip.Name = name;
-            currentStageBlip.Sprite = sprite;
-            currentStageBlip.Color = MY_BLIP_COLOR;
         }
 
         private void nextStage()
@@ -473,30 +445,15 @@ namespace BabyDriver
             currentJob = JobFactory.CreateNewJob(currentLevel);
             currentStageLocation = currentJob.locationSet.heistPickupLocation;
             currentStageLocation.Z = World.GetGroundHeight(new Vector2(currentStageLocation.X, currentStageLocation.Y));
-            createBlip(currentStageLocation, true, CREW_PICKUP_BLIP_NAME, BlipSprite.Cab);
+            currentStageBlip = Utility.createBlip(currentStageLocation, "Crew Pickup");
             currentStageAction = Jobs.Stage.PICKUP;
+            Random random = new Random();
+            int index = random.Next(Dialogue.docMissionReady.Count);
+            string docResponse = Dialogue.docMissionReady[index];
             Utility.DisplayNotificationThisFrame(
-                "Okay, we're ready. Drop by.", "Doc", "Message"
+                docResponse, "Doc", "Message"
             );
             newJobStartTick = 0;
-        }
-
-        private void spawnCrew()
-        {
-            Vector3 crewMemberPos = currentJob.locationSet.heistCrewSpawnLocations[0];
-            crewMemberPos.Z = World.GetGroundHeight(new Vector2(crewMemberPos.X, crewMemberPos.Y));
-            var crewPed = World.CreatePed(PedHash.Michael, crewMemberPos);
-            crewPed.Rotation = currentJob.locationSet.heistCrewSpawnRotation;
-            crewPed.Money = 69;
-            allPedsInvolved.Add(crewPed);
-            crewPed.Weapons.Give(WeaponHash.Pistol, 20, false, true);
-            CrewMember crewMember = new CrewMember(this, crewPed);
-            crewMember.setToDefaultOutfit();
-            currentCrew.Add(crewMember);
-
-            PedGroup playerGroup = Game.Player.Character.CurrentPedGroup;
-            Function.Call(Hash.SET_PED_AS_GROUP_MEMBER, crewPed, playerGroup);
-            Function.Call(Hash.SET_PED_COMBAT_ABILITY, crewPed, 100);
         }
 
         private void resetAll()
@@ -531,14 +488,7 @@ namespace BabyDriver
 
             foreach(Blip blip in World.GetActiveBlips())
             {
-                if (blip.Color == MY_BLIP_COLOR && (
-                    blip.Sprite == CREW_PICKUP_BLIP_SPRITE ||
-                    blip.Sprite == HEIST_LOCATION_BLIP_SPRITE ||
-                    blip.Sprite == CREW_DROPOFF_BLIP_SPRITE
-                ))
-                {
-                    blip.Remove();
-                }
+                if (blip.Color == BlipColor.Yellow2 && (blip.Sprite == BlipSprite.Cab || blip.Sprite == BlipSprite.DollarSign || blip.Sprite == BlipSprite.Garage)) blip.Remove();
             }
             currentStageBlip = null;
 
@@ -558,14 +508,9 @@ namespace BabyDriver
 
             currentCrew = new List<CrewMember>();
             heistTargets = new List<Ped>();
-            allPedsInvolved = new List<Ped>();
             eligibleVehicles = new List<Vehicle>();
-    }
-
-        private void playerIsJackingCar()
-        {
-            Game.Player.Character.GetVehicleIsTryingToEnter().IsStolen = true;
         }
+
 
         // Conditions for Other
 
